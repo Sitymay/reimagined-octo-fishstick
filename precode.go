@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -61,18 +61,26 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 func postTask(w http.ResponseWriter, r *http.Request) {
 	var task Task
-	var buf bytes.Buffer
 
 	defer r.Body.Close()
-	// читаем данные из тела запроса и записываем их в buf
-	_, err := buf.ReadFrom(r.Body)
+
+	// читаем все тело запроса
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// тут мы декодируем
+	if err := json.Unmarshal(body, &task); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	// Преобразуем данные из буфера в байты и декодированные данные сохраняем в указатель на &task
-	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+
+	// тут мы проверяем на наличие такой задачи, если она есть - то возращаем ошибку
+	// (какой именно статус возвращать я не понял, где это почитать?)
+	_, ok := tasks[task.ID]
+	if ok {
+		http.Error(w, "Такая задача уже существует", http.StatusBadRequest)
 		return
 	}
 
